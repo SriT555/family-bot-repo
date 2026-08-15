@@ -84,7 +84,8 @@ def _get_env_overrides() -> dict:
     # App
     if host := os.getenv("APP_HOST"):
         overrides.setdefault("app", {})["host"] = host
-    if port := os.getenv("APP_PORT"):
+    # Cloud Run sets PORT, also support APP_PORT for local dev
+    if port := os.getenv("PORT") or os.getenv("APP_PORT"):
         overrides.setdefault("app", {})["port"] = int(port)
     if env := os.getenv("APP_ENVIRONMENT"):
         overrides.setdefault("app", {})["environment"] = env
