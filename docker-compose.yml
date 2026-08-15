@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  # Main application
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: family-shopping-bot
+    ports:
+      - "8080:8080"
+    environment:
+      - CONFIG_PATH=/app/config.yaml
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_WEBHOOK_URL=${TELEGRAM_WEBHOOK_URL}
+      - TELEGRAM_ALLOWED_USER_IDS=${TELEGRAM_ALLOWED_USER_IDS}
+      - GOOGLE_CREDENTIALS_FILE=/app/credentials/credentials.json
+      - GOOGLE_SPREADSHEET_ID=${GOOGLE_SPREADSHEET_ID}
+      - GOOGLE_SHEET_NAME=${GOOGLE_SHEET_NAME:-Sheet1}
+      - APP_HOST=0.0.0.0
+      - APP_PORT=8080
+      - APP_ENVIRONMENT=development
+    volumes:
+      # Mount config and credentials
+      - ./config.yaml:/app/config.yaml:ro
+      - ./credentials:/app/credentials:ro
+      # Mount source code for hot reload in development
+      - .:/app
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # ngrok tunnel for local webhook testing (optional)
+  # Uncomment and run: docker-compose --profile tunnel up
+  # Then use the ngrok URL as TELEGRAM_WEBHOOK_URL
+  ngrok:
+    image: ngrok/ngrok:latest
+    profiles: ["tunnel"]
+    command: http app:8080
+    ports:
+      - "4040:4040"  # ngrok web interface
+    environment:
+      - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN}
+    depends_on:
+      - app
+
+# Networks
+networks:
+  default:
+    name: family-bot-network

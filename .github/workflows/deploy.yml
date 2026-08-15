@@ -1,0 +1,93 @@
+name: Deploy to Cloud Run
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:  # Allow manual triggers
+
+# Permissions needed for Cloud Run deployment
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  # Google Cloud configuration
+  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  REGION: ${{ secrets.GCP_REGION || 'us-central1' }}
+  SERVICE_NAME: family-shopping-bot
+  # Artifact Registry repository (create once manually or via terraform)
+  REPOSITORY: family-bot-repo
+
+jobs:
+  deploy:
+    name: Deploy to Cloud Run
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.PROJECT_ID }}
+          service_account_key: ${{ secrets.GCP_SA_KEY }}
+          export_default_credentials: true
+
+      - name: Configure Docker for Artifact Registry
+        run: |
+          gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+
+      - name: Build and push Docker image
+        id: build
+        run: |
+          IMAGE_TAG=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SERVICE_NAME }}:${{ github.sha }}
+          docker build -t $IMAGE_TAG .
+          docker push $IMAGE_TAG
+          echo "image=$IMAGE_TAG" >> $GITHUB_OUTPUT
+
+      - name: Deploy to Cloud Run
+        id: deploy
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: ${{ env.SERVICE_NAME }}
+          region: ${{ env.REGION }}
+          image: ${{ steps.build.outputs.image }}
+          flags: |
+            --port=8080
+            --cpu=1
+            --memory=512Mi
+            --min-instances=0
+            --max-instances=10
+            --concurrency=80
+            --timeout=300
+            --set-env-vars=CONFIG_PATH=/app/config.yaml,APP_ENVIRONMENT=production
+            --set-secrets=TELEGRAM_BOT_TOKEN=TELEGRAM_BOT_TOKEN:latest,TELEGRAM_WEBHOOK_URL=TELEGRAM_WEBHOOK_URL:latest,TELEGRAM_ALLOWED_USER_IDS=TELEGRAM_ALLOWED_USER_IDS:latest,GOOGLE_SPREADSHEET_ID=GOOGLE_SPREADSHEET_ID:latest,GOOGLE_SHEET_NAME=GOOGLE_SHEET_NAME:latest
+            --service-account=${{ secrets.GCP_RUN_SA_EMAIL }}
+
+      - name: Get service URL
+        run: |
+          SERVICE_URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} --region=${{ env.REGION }} --format='value(status.url)')
+          echo "Service deployed to: $SERVICE_URL"
+          echo "service_url=$SERVICE_URL" >> $GITHUB_OUTPUT
+
+      - name: Set webhook URL
+        if: ${{ success() }}
+        run: |
+          WEBHOOK_URL="${{ steps.deploy.outputs.service_url }}/webhook"
+          echo "Setting webhook to: $WEBHOOK_URL"
+          # Update the secret with the webhook URL
+          echo "$WEBHOOK_URL" | gcloud secrets versions add TELEGRAM_WEBHOOK_URL --data-file=-
+
+      - name: Output deployment info
+        if: ${{ success() }}
+        run: |
+          echo "��� Deployment successful!"
+          echo "���� Service URL: ${{ steps.deploy.outputs.service_url }}"
+          echo "���� Webhook URL: ${{ steps.deploy.outputs.service_url }}/webhook"
+          echo ""
+          echo "Next steps:"
+          echo "1. Verify the bot works by sending a message"
+          echo "2. Check logs: gcloud run services logs read ${{ env.SERVICE_NAME }} --region=${{ env.REGION }}"
+          echo "3. Monitor: https://console.cloud.google.com/run/detail/${{ env.REGION }}/${{ env.SERVICE_NAME }}/metrics?project=${{ env.PROJECT_ID }}"
