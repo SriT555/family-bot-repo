@@ -77,6 +77,7 @@ jobs:
             --max-instances=10
             --concurrency=80
             --timeout=300
+            --allow-unauthenticated
             --set-env-vars=CONFIG_PATH=/app/config.yaml,APP_ENVIRONMENT=production
             --set-secrets=TELEGRAM_BOT_TOKEN=TELEGRAM_BOT_TOKEN:latest,TELEGRAM_WEBHOOK_URL=TELEGRAM_WEBHOOK_URL:latest,TELEGRAM_ALLOWED_USER_IDS=TELEGRAM_ALLOWED_USER_IDS:latest,GOOGLE_SPREADSHEET_ID=GOOGLE_SPREADSHEET_ID:latest,GOOGLE_SHEET_NAME=GOOGLE_SHEET_NAME:latest
             --service-account=${{ secrets.GCP_RUN_SA_EMAIL }}
