@@ -44,6 +44,16 @@ jobs:
         run: |
           gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
 
+      - name: Create secrets in Secret Manager
+        run: |
+          # Create secrets from GitHub secrets
+          echo "${{ secrets.TELEGRAM_BOT_TOKEN }}" | gcloud secrets create TELEGRAM_BOT_TOKEN --data-file=- --replication-policy=automatic --project=${{ env.PROJECT_ID }} || true
+          echo "${{ secrets.TELEGRAM_ALLOWED_USER_IDS }}" | gcloud secrets create TELEGRAM_ALLOWED_USER_IDS --data-file=- --replication-policy=automatic --project=${{ env.PROJECT_ID }} || true
+          echo "${{ secrets.GOOGLE_SPREADSHEET_ID }}" | gcloud secrets create GOOGLE_SPREADSHEET_ID --data-file=- --replication-policy=automatic --project=${{ env.PROJECT_ID }} || true
+          echo "${{ secrets.GOOGLE_SHEET_NAME }}" | gcloud secrets create GOOGLE_SHEET_NAME --data-file=- --replication-policy=automatic --project=${{ env.PROJECT_ID }} || true
+          # TELEGRAM_WEBHOOK_URL will be created after deployment
+          echo "placeholder" | gcloud secrets create TELEGRAM_WEBHOOK_URL --data-file=- --replication-policy=automatic --project=${{ env.PROJECT_ID }} || true
+
       - name: Build and push Docker image
         id: build
         run: |
