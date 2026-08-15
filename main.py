@@ -1,4 +1,5 @@
 """FastAPI main application for the Family Shopping Bot."""
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 from typing import Dict, Any
@@ -17,6 +18,11 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
+
+# Global state for initialization
+_init_task: asyncio.Task = None
+_init_complete = False
+_init_error: str = None
 
 
 class WebhookUpdate(BaseModel):
@@ -38,40 +44,63 @@ class WebhookUpdate(BaseModel):
     chat_join_request: Dict[str, Any] = None
 
 
+async def _initialize_background():
+    """Background initialization task."""
+    global _init_complete, _init_error
+    try:
+        logger.info("Starting background initialization...")
+        config = get_config()
+
+        # Initialize Google Sheets
+        try:
+            sheets = get_sheets_service()
+            sheets.initialize()
+            logger.info("Google Sheets initialized successfully")
+        except Exception as e:
+            logger.error(f"Failed to initialize Google Sheets: {e}")
+            # Don't raise - allow bot to start for debugging
+
+        # Initialize Telegram bot
+        bot = get_bot()
+        await bot.initialize()
+
+        # Set webhook if URL is configured
+        if config.telegram.webhook_url:
+            try:
+                await bot.set_webhook(config.telegram.webhook_url)
+                logger.info(f"Webhook set to: {config.telegram.webhook_url}")
+            except Exception as e:
+                logger.error(f"Failed to set webhook: {e}")
+        else:
+            logger.info("No webhook URL configured - running in polling mode (development)")
+
+        _init_complete = True
+        logger.info("Background initialization complete")
+    except Exception as e:
+        _init_error = str(e)
+        logger.error(f"Background initialization failed: {e}")
+        _init_complete = True
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Application lifespan manager."""
-    # Startup
-    logger.info("Starting Family Shopping Bot...")
-    config = get_config()
-
-    # Initialize Google Sheets
-    try:
-        sheets = get_sheets_service()
-        sheets.initialize()
-        logger.info("Google Sheets initialized successfully")
-    except Exception as e:
-        logger.error(f"Failed to initialize Google Sheets: {e}")
-        # Don't raise - allow bot to start for debugging
-
-    # Initialize Telegram bot
-    bot = get_bot()
-    await bot.initialize()
-
-    # Set webhook if URL is configured
-    if config.telegram.webhook_url:
-        try:
-            await bot.set_webhook(config.telegram.webhook_url)
-            logger.info(f"Webhook set to: {config.telegram.webhook_url}")
-        except Exception as e:
-            logger.error(f"Failed to set webhook: {e}")
-    else:
-        logger.info("No webhook URL configured - running in polling mode (development)")
+    """Application lifespan manager - starts server immediately, initializes in background."""
+    global _init_task
+    # Startup - fire off background initialization but don't wait
+    logger.info("Starting Family Shopping Bot (server ready immediately)...")
+    _init_task = asyncio.create_task(_initialize_background())
 
     yield
 
     # Shutdown
     logger.info("Shutting down Family Shopping Bot...")
+    if _init_task and not _init_task.done():
+        _init_task.cancel()
+        try:
+            await _init_task
+        except asyncio.CancelledError:
+            pass
+    bot = get_bot()
     await bot.shutdown()
     logger.info("Shutdown complete")
 
@@ -92,7 +121,27 @@ async def health_check():
 
 @app.get("/ready")
 async def readiness_check():
-    """Readiness check - verifies dependencies are available."""
+    """Readiness check - verifies initialization is complete and dependencies are available."""
+    global _init_complete, _init_error
+
+    if not _init_complete:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={
+                "status": "initializing",
+                "message": "Background initialization in progress"
+            }
+        )
+
+    if _init_error:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={
+                "status": "error",
+                "error": _init_error
+            }
+        )
+
     config = get_config()
 
     # Check Google Sheets
