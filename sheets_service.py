@@ -65,7 +65,9 @@ class SheetsService:
             return self._sheet_id
 
         config = get_config()
-        spreadsheet = service.spreadsheets().get(spreadsheetId=config.google_sheets.spreadsheet_id).execute()
+        spreadsheet_id = config.google_sheets.spreadsheet_id
+        logger.info(f"Spreadsheet ID length: {len(spreadsheet_id)}, repr: {repr(spreadsheet_id)}")
+        spreadsheet = service.spreadsheets().get(spreadsheetId=spreadsheet_id).execute()
 
         for sheet in spreadsheet.get("sheets", []):
             if sheet["properties"]["title"] == config.google_sheets.sheet_name:
