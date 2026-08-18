@@ -1,0 +1,28 @@
+# Family Shopping Bot Configuration
+# Copy this file to config.yaml and fill in your values
+
+telegram:
+  # Get from @BotFather on Telegram
+  bot_token: "YOUR_BOT_TOKEN_HERE"
+  # Webhook URL (set after deployment, e.g., https://your-service.run.app/webhook)
+  webhook_url: ""
+  # List of allowed Telegram user IDs (integers)
+  # Get your user ID by messaging @userinfobot on Telegram
+  allowed_user_ids:
+    - 123456789  # Replace with actual user IDs
+    - 987654321
+
+google_sheets:
+  # Path to service account JSON key file
+  credentials_file: "credentials.json"
+  # Google Sheets spreadsheet ID (from URL: https://docs.google.com/spreadsheets/d/SPREADSHEET_ID/edit)
+  spreadsheet_id: "YOUR_SPREADSHEET_ID_HERE"
+  # Sheet name (tab name) - default is "Sheet1"
+  sheet_name: "Sheet1"
+
+app:
+  # Host and port for the FastAPI server
+  host: "0.0.0.0"
+  port: 8080
+  # Environment: development or production
+  environment: "development"
