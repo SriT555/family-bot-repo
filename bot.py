@@ -667,8 +667,9 @@ class ShoppingBot:
         self._application.add_handler(CommandHandler("cancel", self._handle_bought_cancel))
 
         # Handle amount input for /bought flow (check user state first)
+        # Only handle messages that don't look like commands (don't start with /)
         self._application.add_handler(MessageHandler(
-            filters.TEXT & ~filters.COMMAND,
+            filters.TEXT & ~filters.COMMAND & ~filters.Regex(r"^/"),
             self._handle_bought_amount
         ))
 
