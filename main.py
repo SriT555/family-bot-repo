@@ -176,9 +176,30 @@ async def webhook(request: Request):
 
     Receives updates from Telegram and processes them.
     """
+    global _init_complete, _init_error
+
+    # Wait for initialization to complete
+    if not _init_complete:
+        logger.warning("Webhook received but initialization not complete, waiting...")
+        # Wait up to 30 seconds for initialization
+        for _ in range(30):
+            await asyncio.sleep(1)
+            if _init_complete:
+                break
+
+    if _init_error:
+        logger.error(f"Initialization failed: {_init_error}")
+        raise HTTPException(status_code=503, detail="Service not ready")
+
     try:
         # Parse JSON body
         update_data = await request.json()
+
+        # DEBUG: Log incoming update
+        logger.info(f"Webhook received update_id: {update_data.get('update_id')}")
+        if "message" in update_data:
+            msg = update_data["message"]
+            logger.info(f"Message: text='{msg.get('text')}', entities={msg.get('entities')}, from_id={msg.get('from', {}).get('id')}, chat_id={msg.get('chat', {}).get('id')}")
 
         # Validate it's a proper update
         if "update_id" not in update_data:
@@ -282,6 +303,19 @@ async def update_item_status(row: int, status: str):
     except Exception as e:
         logger.error(f"Error updating item status: {e}")
         raise HTTPException(status_code=500, detail="Failed to update status")
+
+
+@app.post("/api/sheets/format")
+async def apply_professional_formatting():
+    """Apply professional formatting to the Google Sheet."""
+    sheets = get_sheets_service()
+    try:
+        service = sheets._build_service()
+        sheets._apply_professional_formatting(service)
+        return {"ok": True, "message": "Professional formatting applied"}
+    except Exception as e:
+        logger.error(f"Error applying formatting: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to apply formatting: {e}")
 
 
 @app.get("/")

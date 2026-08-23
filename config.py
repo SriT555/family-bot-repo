@@ -22,6 +22,7 @@ class GoogleSheetsConfig(BaseModel):
     credentials_file: str = Field(default="credentials.json", description="Path to service account JSON")
     spreadsheet_id: str = Field(..., description="Google Sheets spreadsheet ID")
     sheet_name: str = Field(default="Sheet1", description="Sheet/tab name")
+    currency: str = Field(default="USD", description="Currency for Amount column (USD, INR, EUR, GBP)")
 
 
 class AppConfig(BaseModel):
@@ -80,6 +81,8 @@ def _get_env_overrides() -> dict:
         overrides.setdefault("google_sheets", {})["spreadsheet_id"] = spreadsheet_id
     if sheet_name := os.getenv("GOOGLE_SHEET_NAME"):
         overrides.setdefault("google_sheets", {})["sheet_name"] = sheet_name
+    if currency := os.getenv("GOOGLE_SHEETS_CURRENCY"):
+        overrides.setdefault("google_sheets", {})["currency"] = currency
 
     # App
     if host := os.getenv("APP_HOST"):

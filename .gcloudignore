@@ -1,0 +1,14 @@
+# Ignore files not needed for deployment
+.git
+.gitignore
+.github
+__pycache__
+*.pyc
+.pytest_cache
+.venv
+venv
+.env
+*.md
+!.gcloudignore
+docker-compose.yml
+credentials.json

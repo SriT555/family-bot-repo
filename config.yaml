@@ -9,8 +9,8 @@ telegram:
   # List of allowed Telegram user IDs (integers)
   # Get your user ID by messaging @userinfobot on Telegram
   allowed_user_ids:
-    - 123456789  # Replace with actual user IDs
-    - 987654321
+    - 1783439018
+    - 8841711464
 
 google_sheets:
   # Path to service account JSON key file
@@ -19,6 +19,8 @@ google_sheets:
   spreadsheet_id: "YOUR_SPREADSHEET_ID_HERE"
   # Sheet name (tab name) - default is "Sheet1"
   sheet_name: "Sheet1"
+  # Currency for Amount column (USD, INR, EUR, GBP)
+  currency: "USD"
 
 app:
   # Host and port for the FastAPI server
