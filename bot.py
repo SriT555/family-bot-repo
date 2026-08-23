@@ -482,6 +482,7 @@ class ShoppingBot:
             'items': items,
             'user': user
         }
+        logger.info(f"_handle_bought: stored state for user {user.id}, _user_bought_state now has {len(_user_bought_state)} entries")
 
         await update.message.reply_text(
             f"🛒 **Mark as bought:**\n{item_list}\n\n"
@@ -500,7 +501,9 @@ class ShoppingBot:
     async def _handle_bought_amount(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle amount input for /bought flow (when user has pending bought state)."""
         user = update.effective_user
+        logger.info(f"_handle_bought_amount called: user_id={user.id if user else None}, _user_bought_state keys={list(_user_bought_state.keys())}")
         if not user or user.id not in _user_bought_state:
+            logger.info(f"User {user.id if user else None} not in _user_bought_state, skipping")
             return  # Not in bought flow, let other handlers process
 
         text = update.message.text.strip()
@@ -582,6 +585,7 @@ class ShoppingBot:
 
         # Reuse the main handler logic
         await self._handle_bought(update, context)
+        logger.info(f"_handle_bought_fallback completed, _user_bought_state has {len(_user_bought_state)} entries")
 
     async def _process_bought_bulk(self, update: Update, user, store_filter: str = None):
         """Process bulk bought operation (called from fallback handler)."""
