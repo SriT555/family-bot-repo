@@ -580,14 +580,66 @@ class ShoppingBot:
 
         logger.info(f"/bought fallback handler triggered: item_name='{item_name}', user={user.id}")
 
-        # Check for bulk operations (same logic as main handler)
-        item_name_lower = item_name.lower().lstrip('/')
-        if item_name_lower == "all":
-            await self._process_bought_bulk(update, user, store_filter=None)
-        elif item_name_lower in VALID_STORES:
-            await self._process_bought_bulk(update, user, store_filter=item_name_lower)
+        # Reuse the main handler logic
+        await self._handle_bought(update, context)
+
+    async def _process_bought_bulk(self, update: Update, user, store_filter: str = None):
+        """Process bulk bought operation (called from fallback handler)."""
+        # Get pending items
+        pending_items = self.sheets.get_pending_items()
+        if store_filter:
+            items = [i for i in pending_items if i.get('store', 'misc').lower() == store_filter.lower()]
         else:
-            await self._process_bought_item(update, item_name, user)
+            items = pending_items
+
+        if not items:
+            filter_text = f" for store '/{store_filter}'" if store_filter else ""
+            await update.message.reply_text(f"❌ No pending items found{filter_text}.")
+            return
+
+        # Store state for this user
+        _user_bought_state[user.id] = {
+            'bought_type': 'bulk',
+            'store_filter': store_filter,
+            'items': items,
+            'user': user
+        }
+
+        item_list = "\n".join([f"• {i['item']} x{i['quantity']}" for i in items])
+        filter_text = f" for store '/{store_filter}'" if store_filter else ""
+        await update.message.reply_text(
+            f"🛒 **Mark ALL {len(items)} pending item(s){filter_text} as bought:**\n\n{item_list}\n\n"
+            f"💰 Enter total amount spent (e.g., `75` or `120.50`):"
+        )
+
+    async def _process_bought_item(self, update: Update, item_name: str, user):
+        """Process single item bought operation (called from fallback handler)."""
+        all_items = self.sheets.get_all_items()
+        matching_item = None
+        for item in all_items:
+            if item["status"].lower() == "pending" and item["item"].lower() == item_name.lower():
+                matching_item = item
+                break
+
+        if not matching_item:
+            await update.message.reply_text(
+                f"❌ No pending item found matching: **{item_name}**\n"
+                f"Use `/list` to see pending items."
+            )
+            return
+
+        # Store state for this user
+        _user_bought_state[user.id] = {
+            'bought_type': 'single',
+            'store_filter': None,
+            'items': [matching_item],
+            'user': user
+        }
+
+        await update.message.reply_text(
+            f"🛒 **Mark as bought:** {matching_item['item']} x{matching_item['quantity']} [/{matching_item.get('store', 'misc')}]\n\n"
+            f"💰 Enter amount spent (e.g., `75` or `120.50`):"
+        )
 
     def build_application(self) -> Application:
         """Build and configure the Telegram application."""
