@@ -204,8 +204,24 @@ class ShoppingBot:
             )
             return
 
+        # Strip /add command prefix if present
+        message_text = update.message.text.strip()
+        if message_text.startswith('/add '):
+            message_text = message_text[5:].strip()  # Remove "/add " prefix
+        elif message_text == '/add':
+            await update.message.reply_text(
+                "📝 Please send an item name after /add. Examples:\n"
+                "• `/add diapers 2`\n"
+                "• `/add tomatoes`\n"
+                "• `/add milk 1L`\n"
+                "• `/add bread 3`\n"
+                "• `/add salt, pasta /costco`\n"
+                "• `/add rice 5kg and dal 1kg /indian`"
+            )
+            return
+
         # Parse message (returns list of ParsedMessage)
-        parsed_list = self._parse_message(update.message.text)
+        parsed_list = self._parse_message(message_text)
 
         if not parsed_list or not parsed_list[0].item:
             await update.message.reply_text(
